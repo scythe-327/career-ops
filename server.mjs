@@ -231,6 +231,84 @@ app.post('/run/scrape', async (req, res) => {
   res.json({ success: results.some(r => r.success), results });
 });
 
+app.post('/run/outreach-for', async (req, res) => {
+  try {
+    const { company, role } = req.body || {};
+    if (!company || !role) return res.status(400).json({ error: '"company" and "role" required' });
+
+    const fs = await import('fs');
+    const jsYaml = await import('js-yaml');
+
+    // 1. Load CV
+    const cv = fs.existsSync('cv.md') ? fs.readFileSync('cv.md', 'utf-8') : '';
+    // 2. Load SMTP config
+    const cfg = jsYaml.load(fs.readFileSync('config/email.yml', 'utf-8'));
+    const transporter = (await import('nodemailer')).default.createTransport({
+      host: cfg.smtp_host, port: cfg.smtp_port, secure: cfg.smtp_secure,
+      auth: { user: cfg.smtp_user, pass: cfg.smtp_pass },
+    });
+
+    // 3. Try YC Algolia for company info
+    let jobInfo = null;
+    try {
+      const algoliaKey = process.env.YC_ALGOLIA_KEY || '';
+      if (algoliaKey) {
+        const resA = await fetch(`https://45bwzj1sgc-dsn.algolia.net/1/indexes/WaaSPublicCompanyJob_created_at_desc_production/query`, {
+          method: 'POST',
+          headers: { 'X-Algolia-Application-Id': '45BWZJ1SGC', 'X-Algolia-API-Key': algoliaKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: role, hitsPerPage: 5, filters: `company_name:"${company}"`, attributesToRetrieve: ['title','company_name','locations_for_search','remote','description'] }),
+        });
+        const data = await resA.json();
+        if (data.hits?.length) jobInfo = data.hits[0];
+      }
+    } catch {}
+
+    // 4. Build a genuine outreach email using CV context
+    const name = cfg.from_name || 'Rohan P H';
+    const headline = 'Cloud & Backend Engineer specializing in serverless AWS, Java microservices, and AI';
+    const highlights = cv.includes('60%') ? 'reducing cold-start latency by 60%, cutting cloud OpEx by 65%, and building LLM-powered RAG systems' : 'building and scaling distributed systems on AWS';
+    const companyContext = jobInfo ? `I see you're hiring a ${jobInfo.title} — ${jobInfo.description?.substring(0, 200) || 'building AI-native solutions'}` : `I'm very interested in the ${role} role at ${company}`;
+
+    const body = `Hi ${company} team,
+
+${companyContext}.
+
+I'm ${name}, a ${headline}. At BT Openreach, I've been owning end-to-end delivery of serverless platforms — ${highlights}.
+
+I'm drawn to ${company} because of the meaningful impact you're making, and I'm confident my background in ${(jobInfo?.description || '').includes('AWS') ? 'AWS, distributed systems, and on-the-ground delivery' : 'full-stack engineering, security, and AI'} aligns well with what you're building.
+
+I'd love to chat about how I can contribute.
+
+Best,
+${name}
+${cfg.candidate_linkedin || ''}`;
+
+    // 5. Guess founder emails
+    const domain = company.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
+    const guesses = [`hello@${domain}`, `founders@${domain}`, `apply@${domain}`, `team@${domain}`];
+
+    let sent = false;
+    const results = [];
+    for (const to of guesses) {
+      try {
+        await transporter.sendMail({
+          from: `"${cfg.from_name}" <${cfg.from_email}>`,
+          to, subject: `Application for ${role} at ${company}`, text: body,
+        });
+        results.push({ to, success: true });
+        sent = true;
+        break;
+      } catch (e) {
+        results.push({ to, success: false, error: e.message });
+      }
+    }
+
+    res.json({ success: sent, company, role, candidate_name: name, emails_tried: results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 const SCAN_SCHEDULE = process.env.SCAN_SCHEDULE;
 const OUTREACH_SCHEDULE = process.env.OUTREACH_SCHEDULE;
 const YC_SCHEDULE = process.env.YC_SCHEDULE;

@@ -309,6 +309,35 @@ ${cfg.candidate_linkedin || ''}`;
   }
 });
 
+app.post('/run/ai-prompt', async (req, res) => {
+  const { prompt, format } = req.body || {};
+  if (!prompt) return res.status(400).json({ error: '"prompt" required' });
+
+  try {
+    const { execFile } = await import('child_process');
+    const child = execFile('opencode', ['run', prompt, '--dangerously-skip-permissions', '--format', format === 'json' ? 'json' : 'default'], {
+      cwd: '.',
+      env: { ...process.env, TERM: 'dumb', OPENCODE_CLI_DISABLE_TELEMETRY: '1' },
+      timeout: 300000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    let stdout = '';
+    child.stdout.on('data', d => stdout += d);
+    let stderr = '';
+    child.stderr.on('data', d => stderr += d);
+
+    await new Promise((resolve, reject) => {
+      child.on('close', code => code === 0 ? resolve() : reject(new Error(`opencode exited with code ${code}\n${stderr}`)));
+      child.on('error', reject);
+    });
+
+    res.json({ success: true, result: stdout.trim() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 const SCAN_SCHEDULE = process.env.SCAN_SCHEDULE;
 const OUTREACH_SCHEDULE = process.env.OUTREACH_SCHEDULE;
 const YC_SCHEDULE = process.env.YC_SCHEDULE;

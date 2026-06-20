@@ -9,6 +9,8 @@ RUN npm install
 
 RUN npx playwright install --with-deps chromium
 
+RUN npm install -g opencode-ai
+
 COPY . .
 
 EXPOSE 8000

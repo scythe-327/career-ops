@@ -112,10 +112,10 @@ app.post('/run/test-email', async (req, res) => {
 
     // Use email microservice if configured (Koyeb)
     if (EMAIL_SVC) {
-      const r = await fetch(EMAIL_SVC + '/send-email', {
+      const r = await fetch(EMAIL_SVC.replace(/\/+$/, '') + '/run/test-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, subject: subject || 'Career-Ops Test Email', text: message || 'Test from Career-Ops.' }),
+        body: JSON.stringify({ to, subject: subject || 'Career-Ops Test Email', message: message || 'Test from Career-Ops.' }),
       });
       const d = await r.json();
       return res.json(d);
@@ -341,10 +341,10 @@ ${cfg.candidate_linkedin || ''}`;
     for (const to of guesses) {
       try {
         if (EMAIL_SVC) {
-          const r = await fetch(EMAIL_SVC + '/send-email', {
+          const r = await fetch(EMAIL_SVC.replace(/\/+$/, '') + '/run/test-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to, subject: `Application for ${role} at ${company}`, text: body }),
+            body: JSON.stringify({ to, subject: `Application for ${role} at ${company}`, message: body }),
           });
           const d = await r.json();
           if (d.success) { results.push({ to, success: true }); sent = true; break; }

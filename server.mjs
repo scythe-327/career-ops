@@ -1,9 +1,11 @@
 import express from 'express';
 import { execFile } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { randomUUID } from 'crypto';
 import schedule from 'node-schedule';
 
 const PORT = process.env.PORT || 8000;
+const jobs = {};
 
 const DATA_DIRS = ['output', 'reports', 'jds', 'batch/tracker-additions', 'tmp'];
 
@@ -309,33 +311,46 @@ ${cfg.candidate_linkedin || ''}`;
   }
 });
 
-app.post('/run/ai-prompt', async (req, res) => {
-  const { prompt, format } = req.body || {};
+app.post('/run/ai-prompt', (req, res) => {
+  const { prompt } = req.body || {};
   if (!prompt) return res.status(400).json({ error: '"prompt" required' });
 
-  try {
-    const { execFile } = await import('child_process');
-    const child = execFile('opencode', ['run', prompt, '--dangerously-skip-permissions', '--format', format === 'json' ? 'json' : 'default'], {
-      cwd: '.',
-      env: { ...process.env, TERM: 'dumb', OPENCODE_CLI_DISABLE_TELEMETRY: '1' },
-      timeout: 300000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
+  const jobId = randomUUID().slice(0, 8);
+  jobs[jobId] = { status: 'running', prompt, result: null, error: null, started: Date.now() };
 
-    let stdout = '';
-    child.stdout.on('data', d => stdout += d);
-    let stderr = '';
-    child.stderr.on('data', d => stderr += d);
+  const child = execFile('opencode', ['run', prompt, '--dangerously-skip-permissions', '--format', 'default'], {
+    cwd: '.',
+    env: { ...process.env, TERM: 'dumb', OPENCODE_CLI_DISABLE_TELEMETRY: '1' },
+    timeout: 600000,
+    maxBuffer: 10 * 1024 * 1024,
+  });
 
-    await new Promise((resolve, reject) => {
-      child.on('close', code => code === 0 ? resolve() : reject(new Error(`opencode exited with code ${code}\n${stderr}`)));
-      child.on('error', reject);
-    });
+  let stdout = '', stderr = '';
+  child.stdout.on('data', d => stdout += d);
+  child.stderr.on('data', d => stderr += d);
 
-    res.json({ success: true, result: stdout.trim() });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  child.on('close', code => {
+    jobs[jobId].status = code === 0 ? 'done' : 'error';
+    jobs[jobId].result = stdout.trim();
+    jobs[jobId].error = code !== 0 ? stderr.trim() : null;
+  });
+  child.on('error', err => {
+    jobs[jobId].status = 'error';
+    jobs[jobId].error = err.message;
+  });
+
+  res.json({ success: true, job_id: jobId, status: 'running' });
+});
+
+app.get('/run/ai-prompt/:jobId', (req, res) => {
+  const job = jobs[req.params.jobId];
+  if (!job) return res.status(404).json({ error: 'job not found' });
+  res.json({ job_id: req.params.jobId, status: job.status, result: job.result, error: job.error });
+});
+
+app.get('/run/ai-prompt', (_req, res) => {
+  const list = Object.entries(jobs).slice(-20).map(([id, j]) => ({ job_id: id, status: j.status, prompt: j.prompt?.slice(0, 80), started: j.started }));
+  res.json(list);
 });
 
 const SCAN_SCHEDULE = process.env.SCAN_SCHEDULE;

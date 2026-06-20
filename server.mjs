@@ -211,6 +211,51 @@ app.post('/run/yc-scrape', async (_req, res) => {
   }
 });
 
+app.post('/run/yc-email', async (_req, res) => {
+  try {
+    // 1. Run the scraper
+    await runScript('scripts/yc-scraper.mjs');
+
+    // 2. Read output
+    const { readFileSync, existsSync } = await import('fs');
+    if (!existsSync('data/yc-jobs.json')) return res.status(500).json({ error: 'yc-jobs.json not found after scrape' });
+    const raw = JSON.parse(readFileSync('data/yc-jobs.json', 'utf-8'));
+    const jobs = (raw.jobs || []).slice(0, 8);
+
+    // 3. Build email body
+    let body = 'YC Jobs - Scraped from HF Space\n' + '='.repeat(40) + '\n\n';
+    jobs.forEach((j, i) => {
+      body += `${i + 1}. ${j.title || 'N/A'} @ ${j.company || 'N/A'}\n`;
+      body += `   Location: ${j.location || 'N/A'}\n`;
+      body += `   ${j.url || 'N/A'}\n\n`;
+    });
+
+    // 4. Send via Koyeb proxy or direct
+    const cfg = (await import('js-yaml')).load(readFileSync('config/email.yml', 'utf-8'));
+    if (EMAIL_SVC) {
+      const r = await fetch(EMAIL_SVC.replace(/\/+$/, '') + '/run/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: process.env.SMTP_USER || 'lockin3277@gmail.com', subject: 'YC Jobs - Scraped from HF Space', message: body }),
+      });
+      const d = await r.json();
+      res.json({ success: d.success, jobs: jobs.length, email_sent: d.success, body: body.substring(0, 500) });
+    } else {
+      const transporter = (await import('nodemailer')).default.createTransport({
+        host: cfg.smtp_host, port: cfg.smtp_port, secure: cfg.smtp_secure,
+        auth: { user: cfg.smtp_user, pass: cfg.smtp_pass },
+      });
+      await transporter.sendMail({
+        from: `"${cfg.from_name}" <${cfg.from_email}>`,
+        to: 'lockin3277@gmail.com', subject: 'YC Jobs - Scraped from HF Space', text: body,
+      });
+      res.json({ success: true, jobs: jobs.length, body: body.substring(0, 500) });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/run/yc-scrape-eng', async (req, res) => {
   try {
     const args = [];

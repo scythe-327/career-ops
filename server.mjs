@@ -11,6 +11,103 @@ const jobs = {};
 
 const DATA_DIRS = ['output', 'reports', 'jds', 'batch/tracker-additions', 'tmp'];
 
+// Curated company → domain map (from local yc-outreach.mjs)
+const DOMAIN_MAP = {
+  'Yassir': 'yassir.com', 'Cashfree Payments': 'cashfree.com', 'Runa': 'runa.com',
+  'Enode': 'enode.io', 'GIMO': 'gimo.vn', 'Ashby': 'ashbyhq.com', 'Enerjazz': 'enerjazz.com',
+  'Groww': 'groww.in', 'Smartcuts': 'smartcuts.com', 'Deepnote': 'deepnote.com',
+  'Loombotic': 'loombotic.com', 'REVER': 'reverscore.com', 'Apprentice Health': 'apprenticehealth.com',
+  'Bolster': 'bolster.com', 'BusinessOnBot': 'businessonbot.com', 'GoGoGrandparent': 'gogograndparent.com',
+  'Baraka': 'baraka.com', 'Kodo': 'kodo.cards', 'Metorial': 'metorial.com',
+  'GovernGPT': 'governgpt.com', 'Sirdab': 'sirdab.com', 'Emergent': 'emergent.sh',
+  'Stripe': 'stripe.com', 'Spellbrush': 'spellbrush.com', 'Explorex': 'explorex.co',
+  'Razorpay': 'razorpay.com', 'DreamCraft Entertainment, Inc.': 'dreamcraft.com', 'Leadbay': 'leadbay.co',
+  'Haystack': 'haystack.com', 'Informed K12': 'informedk12.com', 'Payflow': 'payflow.es',
+  'Lightdash': 'lightdash.com', 'Reframe (Glucobit)': 'reframefitness.com', 'Tavus': 'tavus.com',
+  'Veryfi, Inc.': 'veryfi.com', 'Ridecell': 'ridecell.com', 'Prembly (formerly Identitypass)': 'prembly.com',
+  'Axross Pte Ltd': 'axross.com', 'Miso': 'miso.ai', 'Osium AI': 'osium.ai',
+  'Inito': 'inito.com', 'Quickchat AI': 'quickchat.ai', 'DeepAware AI': 'deepaware.ai',
+  'Infer': 'infer.in', 'Wifi Dabba, Inc.': 'wifidabba.com', 'Swif.ai': 'swif.ai',
+  'Odeko': 'odeko.com', 'Karbon Card': 'karboncard.com', 'Etleap': 'etleap.com', 'Findly': 'findly.ai',
+  'Heroic Labs': 'heroiclabs.com', 'OneChronos': 'onechronos.com', 'PostHog': 'posthog.com',
+  'FamPay': 'fampay.in', 'ClassDojo': 'classdojo.com', 'AiPrise': 'aiprise.com', 'SigmaOS': 'sigmaos.com',
+  'Olympian Motors': 'olympianmotors.com', 'Ziina': 'ziina.com', 'Pelago': 'pelagohealth.com',
+  'Instacart': 'instacart.com', 'Pop Meals': 'popmeals.com', 'Ankr Health': 'ankrhealth.com',
+  'Constant': 'useconstant.com', 'MorphoAI': 'morphoai.com', 'Autumn': 'autumn.com',
+  'Kontigo': 'kontigo.com', 'Upstream': 'upstream.com', 'SuperKalam': 'superkalam.com',
+  'Circle Medical': 'circlemedical.com', 'ARQ': 'arq.com', 'Hapi': 'hapi.com',
+  'Proven Group': 'proven.com', 'Fleek': 'fleek.com', 'Atomic Industries': 'atomicindustries.com',
+  'Roboflow': 'roboflow.com', 'Solve Intelligence': 'solveintelligence.com', 'Encord': 'encord.com',
+  'Airweave': 'airweave.ai', 'Aglide': 'aglide.com', 'Respan': 'respan.com', 'Hera': 'hera.com',
+  'arnata': 'arnata.com', 'Lucis': 'lucis.com', 'Leeroo': 'leeroo.com', 'Terra API': 'terraapi.com',
+  'ProjectPro': 'projectpro.com', 'Runway': 'runwayteam.com', 'Carbonfact': 'carbonfact.com',
+  'Prolific': 'prolific.com', 'QFEX': 'qfex.com', 'Seal': 'seal.com', 'Humaans': 'humaans.com',
+  'Helloverify': 'helloverify.com', 'Porter': 'porter.com', 'Zippi': 'zippi.com', 'Mercura': 'mercura.com',
+  'Legora': 'legora.com', 'Human Archive': 'humanarchive.com', 'Albedo': 'albedo.com',
+  'CircuitHub': 'circuithub.com', 'Overview': 'overview.com', 'HyLight': 'hylight.com',
+  'Intelline': 'intelline.com', 'Spaceium Inc': 'spaceium.com', 'Rimward': 'rimward.com',
+  'Kalam Labs': 'kalamlabs.com', 'Yummy Future': 'yummyfuture.com', 'Charge Robotics': 'chargerobotics.com',
+  'Noora Health': 'noorahealth.com', 'Mino Games': 'minogames.com', 'DoorDash': 'doordash.com',
+  'Xendit': 'xendit.com', 'Shuttle Central': 'shuttlecentral.com', 'Landeed': 'landeed.com',
+  'AgentCollect': 'agentcollect.com', 'VectorShift': 'vectorshift.me', 'Sourcebot': 'sourcebot.dev',
+  'Closure': 'closure-intel.com', 'Garage': 'shopgarage.com', 'Astraea': 'tryastraea.com',
+  'Manufact': 'manufact.com', 'Thunder Compute': 'thundercompute.com',
+};
+
+// Curated founder / contact emails (from local yc-outreach.mjs)
+const FOUNDER_EMAILS = {
+  'PostHog': 'james@posthog.com', 'GoGoGrandparent': 'justin@gogograndparent.com',
+  'Deepnote': 'jakub@deepnote.com', 'Roboflow': 'joseph@roboflow.com',
+  'Porter': 'jonah@porter.com', 'Runway': 'siqi@runwayteam.com',
+  'Tavus': 'hassaan@tavus.com', 'Inito': 'varun@inito.com',
+  'Stripe': 'recruiting@stripe.com', 'Razorpay': 'careers@razorpay.com',
+  'Groww': 'careers@groww.in', 'Cashfree Payments': 'careers@cashfree.com',
+  'FamPay': 'kush@fampay.in', 'Baraka': 'faris@baraka.com',
+  'Kodo': 'rohit@kodo.cards', 'Veryfi, Inc.': 'david@veryfi.com',
+  'SuperKalam': 'abhishek@superkalam.com', 'Emergent': 'team@emergent.sh',
+  'Noora Health': 'careers@noorahealth.com', 'Ankr Health': 'team@ankrhealth.com',
+  'Infer': 'careers@infer.in', 'Karbon Card': 'peeyush@karboncard.com',
+  'Wifi Dabba, Inc.': 'shubhendu@wifidabba.com', 'Lightdash': 'ollie@lightdash.com',
+  'Circle Medical': 'careers@circlemedical.com', 'Spellbrush': 'li@spellbrush.com',
+  'Leadbay': 'team@leadbay.co', 'Prembly (formerly Identitypass)': 'lanre@prembly.com',
+  'Encord': 'ulrik@encord.com', 'Terra API': 'team@terraapi.com',
+  'Leeroo': 'founders@leeroo.com', 'Osium AI': 'founders@osium.ai',
+};
+
+function guessDomain(company) {
+  const clean = (company || '').trim();
+  if (DOMAIN_MAP[clean]) return DOMAIN_MAP[clean];
+  const simplified = clean.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^(the|a)/, '');
+  return `${simplified}.com`;
+}
+
+function findContactEmail(company) {
+  // 1. Curated founder emails
+  if (FOUNDER_EMAILS[company]) return FOUNDER_EMAILS[company];
+
+  const domain = guessDomain(company);
+
+  // 2. Patterns to try in order
+  const nameParts = company.split(/[\s-]+/);
+  const first = nameParts[0]?.toLowerCase().replace(/[^a-z]/g, '') || '';
+  const patterns = [
+    `hello@${domain}`,
+    `team@${domain}`,
+    `founders@${domain}`,
+    `apply@${domain}`,
+    `careers@${domain}`,
+    `recruiting@${domain}`,
+    `jobs@${domain}`,
+  ];
+  // Add firstname@domain if company name is a person (single word)
+  if (first && nameParts.length <= 2) patterns.unshift(`${first}@${domain}`);
+
+  return { domain, patterns };
+}
+
+// Email verification cache (skips already-bounced domains)
+const bouncedDomains = new Set();
+
 const STARTER_FILES = {
   'data/pipeline.md': '# Pipeline Inbox\n\n## Pendientes\n\n## Procesadas\n',
   'data/applications.md': '# Applications Tracker\n\n| # | Date | Company | Role | Score | Status | PDF | Report | Notes |\n|---|------|---------|------|-------|--------|-----|--------|-------|\n',
@@ -351,12 +448,16 @@ app.post('/run/yc-outreach', async (req, res) => {
           }
         } catch {}
       }
+      let found = null;
       if (!contactEmail) {
-        const domain = target.company?.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
-        const nameParts = target.company?.split(/[\s-]+/) || [];
-        const first = nameParts[0]?.toLowerCase() || 'hello';
-        contactEmail = `${first}@${domain}`;
-        contactName = `${target.company} Team`;
+        found = findContactEmail(target.company);
+        if (typeof found === 'string') {
+          contactEmail = found;
+          contactName = `${target.company} Team`;
+        } else if (found.patterns?.length) {
+          contactEmail = found.patterns[0];
+          contactName = `${target.company} Team`;
+        }
       }
 
       const emailBody = `Hi ${contactName || target.company} team,
@@ -373,23 +474,40 @@ Best,
 ${name}
 ${cfg.candidate_linkedin || ''}`;
 
+      // Try multiple contact emails (curated match, then patterns)
+      const tries = found ? (typeof found === 'string' ? [found] : [contactEmail, ...found.patterns.filter(p => p !== contactEmail)]) : [contactEmail].filter(Boolean);
       let emailResult = { success: false };
-      try {
-        const r = await fetch((EMAIL_SVC || 'http://localhost:' + PORT).replace(/\/+$/, '') + '/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: contactEmail, subject: `Application for ${target.title} at ${target.company}`, text: emailBody }),
-        });
-        emailResult = await r.json();
-      } catch (e) { emailResult = { success: false, error: e.message }; }
+      let sentEmail = null;
+      for (const addr of tries) {
+        if (bouncedDomains.has(addr.split('@')[1])) continue;
+        try {
+          const r = await fetch((EMAIL_SVC || 'http://localhost:' + PORT).replace(/\/+$/, '') + '/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: addr, subject: `Application for ${target.title} at ${target.company}`, text: emailBody }),
+          });
+          const result = await r.json();
+          if (result.success) {
+            emailResult = { success: true };
+            sentEmail = addr;
+            break;
+          }
+          emailResult = { success: false, error: result.error };
+        } catch (e) {
+          emailResult = { success: false, error: e.message };
+          const domain = addr.split('@')[1];
+          if (domain) bouncedDomains.add(domain);
+        }
+      }
 
       const ts = new Date().toISOString();
-      const draftLine = `${ts}\t${target.company}\t${target.title}\t${contactName}\t${contactEmail}\toutreach\t${emailResult.success ? 'sent' : 'pending'}\tApplication for ${target.title} at ${target.company}\t${emailBody.substring(0,100)}...\n`;
+      const finalEmail = sentEmail || contactEmail;
+      const draftLine = `${ts}\t${target.company}\t${target.title}\t${contactName}\t${finalEmail}\toutreach\t${emailResult.success ? 'sent' : 'pending'}\tApplication for ${target.title} at ${target.company}\t${emailBody.substring(0,100)}...\n`;
       writeFileSync('data/outreach.tsv', draftLine, { flag: 'as+' });
 
       results.push({
         target: { company: target.company, title: target.title, score: target.score },
-        contact: { name: contactName, email: contactEmail },
+        contact: { name: contactName, email: finalEmail },
         email_sent: emailResult.success,
       });
     }
@@ -527,32 +645,23 @@ Best,
 ${name}
 ${cfg.candidate_linkedin || ''}`;
 
-    // 5. Guess founder emails
-    const domain = company.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
-    const guesses = [`hello@${domain}`, `founders@${domain}`, `apply@${domain}`, `team@${domain}`];
+    // 5. Find contact emails (curated map + smart patterns)
+    const found = findContactEmail(company);
+    const guesses = typeof found === 'string' ? [found] : found.patterns;
 
     let sent = false;
     const results = [];
     for (const to of guesses) {
       try {
-        if (EMAIL_SVC) {
-          const r = await fetch(EMAIL_SVC.replace(/\/+$/, '') + '/run/test-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to, subject: `Application for ${role} at ${company}`, message: body }),
-          });
-          const d = await r.json();
-          if (d.success) { results.push({ to, success: true }); sent = true; break; }
-          else { results.push({ to, success: false, error: d.error }); }
-        } else {
-          await transporter.sendMail({
-            from: `"${cfg.from_name}" <${cfg.from_email}>`,
-            to, subject: `Application for ${role} at ${company}`, text: body,
-          });
-          results.push({ to, success: true });
-          sent = true;
-          break;
-        }
+        const ephost = (EMAIL_SVC || 'http://localhost:' + PORT).replace(/\/+$/, '');
+        const r = await fetch(ephost + '/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to, subject: `Application for ${role} at ${company}`, text: body }),
+        });
+        const d = await r.json();
+        if (d.success) { results.push({ to, success: true }); sent = true; break; }
+        else { results.push({ to, success: false, error: d.error }); }
       } catch (e) {
         results.push({ to, success: false, error: e.message });
       }

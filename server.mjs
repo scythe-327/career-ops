@@ -1,6 +1,6 @@
 import express from 'express';
 import { execFile } from 'child_process';
-import { existsSync, mkdirSync, writeFileSync, readdirSync, copyFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 import schedule from 'node-schedule';
 
@@ -122,21 +122,12 @@ function ensureDataFiles() {
   for (const [file, content] of Object.entries(STARTER_FILES)) {
     if (!existsSync(file)) writeFileSync(file, content, 'utf-8');
   }
-  // Create config/email.yml from env vars (HF Spaces) — refresh always to pick up secret changes
+  // Create config/email.yml from env vars — refresh always to pick up secret changes
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
     const yml = `smtp_host: smtp.gmail.com\nsmtp_port: 587\nsmtp_secure: false\nsmtp_user: '${process.env.SMTP_USER}'\nsmtp_pass: '${process.env.SMTP_PASS}'\nfrom_name: 'Rohan P H'\nfrom_email: '${process.env.SMTP_USER}'\ncandidate_linkedin: 'https://linkedin.com/in/rohan-p-h-876865250'\ncandidate_portfolio: 'https://rohanph-cloud-engineer-75sm7wl.gamma.site/'\n`;
     mkdirSync('config', { recursive: true });
     writeFileSync('config/email.yml', yml, 'utf-8');
     console.log('Created config/email.yml from SMTP_USER/SMTP_PASS env vars');
-  }
-  // Copy persistent config from /data/config/ if available (HF Spaces)
-  if (existsSync('/data/config/')) {
-    for (const f of readdirSync('/data/config/')) {
-      if (!existsSync(f)) {
-        copyFileSync('/data/config/' + f, f);
-        console.log('Restored ' + f + ' from /data/config/');
-      }
-    }
   }
 }
 
@@ -285,25 +276,6 @@ app.post('/run/doctor', async (_req, res) => {
   }
 });
 
-app.post('/run/upload-config', (req, res) => {
-  try {
-    const { files } = req.body || {};
-    if (!files || typeof files !== 'object') return res.status(400).json({ error: 'files object required' });
-    mkdirSync('/data/config', { recursive: true });
-    const written = [];
-    for (const [name, content] of Object.entries(files)) {
-      const safe = name.replace(/[^a-zA-Z0-9._-]/g, '');
-      if (!safe) continue;
-      writeFileSync('/data/config/' + safe, String(content), 'utf-8');
-      writeFileSync(safe, String(content), 'utf-8');
-      written.push(safe);
-    }
-    res.json({ success: true, files: written });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 app.post('/run/verify', async (_req, res) => {
   try {
     await runScript('verify-pipeline.mjs');
@@ -350,7 +322,7 @@ app.post('/run/yc-email', async (_req, res) => {
     const jobs = (raw.jobs || []).slice(0, 8);
 
     // 3. Build email body
-    let body = 'YC Jobs - Scraped from HF Space\n' + '='.repeat(40) + '\n\n';
+    let body = 'YC Jobs - Scraped\n' + '='.repeat(40) + '\n\n';
     jobs.forEach((j, i) => {
       body += `${i + 1}. ${j.title || 'N/A'} @ ${j.company || 'N/A'}\n`;
       body += `   Location: ${j.location || 'N/A'}\n`;
@@ -363,7 +335,7 @@ app.post('/run/yc-email', async (_req, res) => {
       const r = await fetch(EMAIL_SVC.replace(/\/+$/, '') + '/run/test-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: process.env.SMTP_USER || 'lockin3277@gmail.com', subject: 'YC Jobs - Scraped from HF Space', message: body }),
+        body: JSON.stringify({ to: process.env.SMTP_USER || 'lockin3277@gmail.com', subject: 'YC Jobs - Scraped', message: body }),
       });
       const d = await r.json();
       res.json({ success: d.success, jobs: jobs.length, email_sent: d.success, body: body.substring(0, 500) });
@@ -374,7 +346,7 @@ app.post('/run/yc-email', async (_req, res) => {
       });
       await transporter.sendMail({
         from: `"${cfg.from_name}" <${cfg.from_email}>`,
-        to: 'lockin3277@gmail.com', subject: 'YC Jobs - Scraped from HF Space', text: body,
+        to: 'lockin3277@gmail.com', subject: 'YC Jobs - Scraped', text: body,
       });
       res.json({ success: true, jobs: jobs.length, body: body.substring(0, 500) });
     }

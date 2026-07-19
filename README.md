@@ -1,12 +1,3 @@
----
-title: Career-Ops
-emoji: 🚀
-colorFrom: blue
-colorTo: green
-sdk: docker
-app_port: 7860
----
-
 # Career-Ops
 
 [English](README.md) | [Español](README.es.md) | [Português (Brasil)](README.pt-BR.md) | [한국어](README.ko-KR.md) | [日本語](README.ja.md) | [Русский](README.ru.md)
